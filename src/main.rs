@@ -16,11 +16,12 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
 static CLIENT: LazyLock<Client> = LazyLock::new(|| {
     Client::builder()
         .user_agent(USER_AGENT)
+        .proxy(reqwest::Proxy::all("socks5://192.168.2.1:7890").expect("Failed to create proxy"))
         .build()
         .expect("Failed to create HTTP client")
 });
 static PB: LazyLock<MultiProgress> = LazyLock::new(MultiProgress::new);
-static SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(2)));
+static SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(5)));
 
 #[derive(Parser)]
 #[command(author, version, about = "下载 Kemono / Coomer 的视频并保存到文件夹")]
