@@ -129,5 +129,8 @@ pub async fn download_attachments(
             pb.finish_and_clear();
         });
     }
+
+    tasks.join_all().await;
+
     Ok(())
 }
