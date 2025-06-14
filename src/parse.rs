@@ -100,7 +100,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
             match resp {
                 Ok(resp) if resp.status().is_success() => {
                     let json: serde_json::Value = resp.json().await.unwrap_or_default();
-                    if let Some(atts) = json.get("post").unwrap().get("attachments") {
+                    if let Some(atts) = json.get("attachments") {
                         let list: Vec<Attachment> =
                             serde_json::from_value(atts.clone()).unwrap_or_default();
                         attachments.extend(list);
