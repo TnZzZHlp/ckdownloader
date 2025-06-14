@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     let atts = get_details(&args.url, all_ids).await?;
 
     // 开始下载
-    // download_attachments(&args.output, &args.url, atts).await?;
+    download_attachments(&args.url, &args.output, atts).await?;
 
     Ok(())
 }

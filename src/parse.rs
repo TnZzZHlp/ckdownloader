@@ -80,11 +80,9 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
     pb.set_message("正在获取详情...");
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_style(
-        style::ProgressStyle::with_template(
-            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-        )
-        .unwrap()
-        .progress_chars("=>-"),
+        style::ProgressStyle::with_template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len}")
+            .unwrap()
+            .progress_chars("=>-"),
     );
     for id in ids {
         let attachments = Arc::clone(&attachments);
