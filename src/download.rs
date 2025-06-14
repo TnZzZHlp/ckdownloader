@@ -75,7 +75,7 @@ pub async fn download_attachments(
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
             pb.set_style(
                 ProgressStyle::with_template(
-                    "{spinner:.yellow} [{wide_bar:.magenta/blue}] [{bytes}/{total_bytes}] [{decimal_bytes_per_sec}] ({percent}%) 🔄{eta}"
+                    "{spinner:.yellow} [{wide_bar:.magenta/blue}] [{bytes}/{total_bytes}] [{decimal_bytes_per_sec}] {eta}🔄"
                 )
                 .unwrap()
                 .progress_chars("#>-"),
