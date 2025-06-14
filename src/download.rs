@@ -54,7 +54,7 @@ pub async fn download_attachments(
                     "{spinner:.yellow} {wide_bar:.magenta/blue} {bytes}/{total_bytes} {decimal_bytes_per_sec} ({percent}%) 🔄{eta}"
                 )
                 .unwrap()
-                .progress_chars("▪▫▪")
+                .progress_chars("#>-"),
             );
 
             let folder = format!("{}/{}", output, username);
