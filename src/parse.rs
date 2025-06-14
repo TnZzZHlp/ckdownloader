@@ -81,7 +81,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_style(
         style::ProgressStyle::with_template(
-            "[{elapsed_precise}] {wide_bar:.cyan/blue} {pos}/{len}",
+            "[{elapsed_precise}] [{wide_bar:.cyan/blue}] [{pos}/{len}]",
         )
         .unwrap()
         .progress_chars("=>-"),

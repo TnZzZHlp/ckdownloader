@@ -46,7 +46,31 @@ pub async fn download_attachments(
         tasks.spawn(async move {
             let _permit = SEM.acquire().await;
 
-            let pb = PB.add(indicatif::ProgressBar::new(0));
+            let folder = format!("{}/{}", output, username);
+            let _ = fs::create_dir_all(&folder).await;
+            let path = format!("{}/{}", folder, att.name);
+            let mut downloaded = 0u64;
+            if Path::new(&path).exists() {
+                downloaded = fs::metadata(&path).await.unwrap().len();
+            }
+            let mut req = CLIENT.get(format!(
+                "{}/data{}",
+                att.server.as_ref().unwrap_or(&format!(
+                    "https://{}",
+                    domain
+                )),
+                att.path
+            ));
+            if downloaded > 0 {
+                req = req.header(header::RANGE, format!("bytes={}-", downloaded));
+            }
+
+
+            let resp = req.send().await.unwrap();
+
+            let pb = PB.add(indicatif::ProgressBar::new(
+                downloaded + resp.content_length().unwrap_or(0),
+            ));
             pb.set_message(format!("正在下载: {}", att.name));
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
             pb.set_style(
@@ -57,25 +81,6 @@ pub async fn download_attachments(
                 .progress_chars("#>-"),
             );
 
-            let folder = format!("{}/{}", output, username);
-            let _ = fs::create_dir_all(&folder).await;
-            let path = format!("{}/{}", folder, att.name);
-            let mut downloaded = 0u64;
-            if Path::new(&path).exists() {
-                downloaded = fs::metadata(&path).await.unwrap().len();
-            }
-            let mut req = CLIENT.get(format!(
-                "{}{}",
-                att.server.as_ref().unwrap_or(&format!(
-                    "https://{}",
-                    domain
-                )),
-                att.path
-            ));
-            if downloaded > 0 {
-                req = req.header(header::RANGE, format!("bytes={}-", downloaded));
-            }
-            let resp = req.send().await.unwrap();
             if resp.status() == 416 {
                 let _ = PB.println(format!(
                     "文件已下载完成: {} - {}",
