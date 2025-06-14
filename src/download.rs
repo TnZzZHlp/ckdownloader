@@ -1,0 +1,132 @@
+use futures_util::StreamExt;
+use indicatif::ProgressStyle;
+use reqwest::header;
+use std::path::Path;
+use std::sync::Arc;
+use tokio::fs::{self, OpenOptions};
+use tokio::io::AsyncWriteExt;
+use tokio::task::JoinSet;
+
+use crate::parse::Attachment;
+use crate::{CLIENT, PB, SEM};
+pub async fn download_attachments(
+    url: &str,
+    output: &str,
+    attachments: Vec<Attachment>,
+) -> anyhow::Result<()> {
+    let url = reqwest::Url::parse(url)
+        .map_err(|e| anyhow::anyhow!("无效的 URL: {}，错误: {}", url, e))?;
+    let domain = Arc::new(
+        url.host_str()
+            .ok_or_else(|| anyhow::anyhow!("无法解析域名: {}", url))?
+            .to_string(),
+    );
+    let username = Arc::new(
+        url.path_segments()
+            .and_then(|segments| segments.last())
+            .ok_or_else(|| anyhow::anyhow!("无法获取用户名"))?
+            .to_string(),
+    );
+
+    let video_pbar = Arc::new(PB.add(indicatif::ProgressBar::new(attachments.len() as u64)));
+    video_pbar.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{bar:40.green/white} {pos}/{len} ({percent}%) {elapsed_precise} ⏳{eta_precise}",
+            )
+            .unwrap()
+            .progress_chars("█▉▊▋▌▍▎▏  "),
+    );
+
+    let mut tasks = JoinSet::new();
+    for att in attachments {
+        let video_pbar = Arc::clone(&video_pbar);
+        let output = output.to_string();
+        let username = Arc::clone(&username);
+        let domain = Arc::clone(&domain);
+
+        tasks.spawn(async move {
+            let _permit = SEM.acquire().await;
+
+            let pb = PB.add(indicatif::ProgressBar::new(0));
+            pb.set_message(format!("正在下载: {}", att.name));
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.yellow} {bar:40.magenta/blue} {bytes}/{total_bytes} ({percent}%) 🔄{eta}"
+                )
+                .unwrap()
+                .progress_chars("▪▫▪")
+            );
+
+            let folder = format!("{}/{}", output, username);
+            fs::create_dir_all(&folder).await;
+            let path = format!("{}/{}", folder, att.name);
+            let mut downloaded = 0u64;
+            if Path::new(&path).exists() {
+                downloaded = fs::metadata(&path).await.unwrap().len();
+            }
+            let mut req = CLIENT.get(format!(
+                "{}{}",
+                att.server.as_ref().unwrap_or(&domain),
+                att.path
+            ));
+            if downloaded > 0 {
+                req = req.header(header::RANGE, format!("bytes={}-", downloaded));
+            }
+            let resp = req.send().await.unwrap();
+            if resp.status() == 416 {
+                PB.println(format!(
+                    "文件已下载完成: {} - {}",
+                    resp.status(),
+                    resp.url()
+                ));
+                video_pbar.inc(1);
+                pb.finish_and_clear();
+                return;
+            }
+            if !(resp.status().is_success() || resp.status() == 206) {
+                PB.println(format!(
+                    "下载失败: {} - {}",
+                    resp.status(),
+                    resp.url()
+                ));
+                video_pbar.inc(1);
+                pb.finish_and_clear();
+                return;
+            }
+            if resp.status() == 206 {
+                resp.headers()
+                    .get(header::CONTENT_RANGE)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.split('/').last())
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(downloaded + resp.content_length().unwrap_or(0))
+            } else {
+                resp.content_length().unwrap_or(0)
+            };
+
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&path)
+                .await.unwrap();
+            let mut pos = downloaded;
+            pb.set_length(pos + resp.content_length().unwrap_or(0));
+            let mut resp_stream = resp.bytes_stream();
+            while let Some(chunk) = resp_stream.next().await {
+                let chunk = chunk.unwrap();
+                let len = chunk.len();
+                pos += len as u64;
+                file.write_all(&chunk).await.unwrap();
+                pb.set_position(pos);
+            }
+
+            file.flush().await.unwrap();
+
+            video_pbar.inc(1);
+            pb.finish_and_clear();
+        });
+    }
+    Ok(())
+}
