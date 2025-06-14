@@ -66,7 +66,13 @@ pub async fn download_attachments(
             }
 
 
-            let resp = req.send().await.unwrap();
+            let resp = match req.send().await {
+                Ok(resp) => resp,
+                Err(err) => {
+                    let _ = PB.println(format!("下载失败: {} - {}", att.name, err));
+                    return;
+                }
+            };
 
             let pb = PB.add(indicatif::ProgressBar::new(
                 downloaded + resp.content_length().unwrap_or(0),
