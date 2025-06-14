@@ -107,7 +107,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
                     }
                 }
                 _ => {
-                    eprintln!("获取详情失败 {}", id);
+                    let _ = PB.println(format!("获取详情失败 {}", id));
                 }
             }
             pb.inc(1);
