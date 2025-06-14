@@ -31,11 +31,9 @@ pub async fn download_attachments(
     let video_pbar = Arc::new(PB.add(indicatif::ProgressBar::new(attachments.len() as u64)));
     video_pbar.set_style(
         ProgressStyle::default_bar()
-            .template(
-                "{bar:40.green/white} {pos}/{len} ({percent}%) {elapsed_precise} ⏳{eta_precise}",
-            )
+            .template("{wide_bar:.green/white} {pos}/{len}")
             .unwrap()
-            .progress_chars("█▉▊▋▌▍▎▏  "),
+            .progress_chars("#>-"),
     );
 
     let mut tasks = JoinSet::new();
@@ -53,7 +51,7 @@ pub async fn download_attachments(
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
             pb.set_style(
                 ProgressStyle::with_template(
-                    "{spinner:.yellow} {bar:40.magenta/blue} {bytes}/{total_bytes} ({percent}%) 🔄{eta}"
+                    "{spinner:.yellow} {wide_bar:.magenta/blue} {bytes}/{total_bytes} {decimal_bytes_per_sec} ({percent}%) 🔄{eta}"
                 )
                 .unwrap()
                 .progress_chars("▪▫▪")
