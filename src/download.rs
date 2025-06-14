@@ -127,11 +127,18 @@ pub async fn download_attachments(
             pb.set_length(pos + resp.content_length().unwrap_or(0));
             let mut resp_stream = resp.bytes_stream();
             while let Some(chunk) = resp_stream.next().await {
-                let chunk = chunk.unwrap();
-                let len = chunk.len();
-                pos += len as u64;
-                file.write_all(&chunk).await.unwrap();
-                pb.set_position(pos);
+                match chunk {
+                    Ok(chunk) => {
+                        let len = chunk.len();
+                        pos += len as u64;
+                        file.write_all(&chunk).await.unwrap();
+                        pb.set_position(pos);
+                    }
+                    Err(err) => {
+                        let _ = PB.println(format!("下载失败: {} - {}", att.name, err));
+                        return;
+                    }
+                }
             }
 
             file.flush().await.unwrap();
