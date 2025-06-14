@@ -66,7 +66,10 @@ pub async fn download_attachments(
             }
             let mut req = CLIENT.get(format!(
                 "{}{}",
-                att.server.as_ref().unwrap_or(&domain),
+                att.server.as_ref().unwrap_or(&format!(
+                    "https://{}",
+                    domain
+                )),
                 att.path
             ));
             if downloaded > 0 {
