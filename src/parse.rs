@@ -20,7 +20,7 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
     let parts = url.path_segments().unwrap().collect::<Vec<_>>().join("/");
 
     loop {
-        PB.println(format!("正在获取第 {} 页数据...", offset / PAGE_SIZE + 1));
+        let _ = PB.println(format!("正在获取第 {} 页数据...", offset / PAGE_SIZE + 1));
         let api_url = format!("https://{domain}/api/v1/{parts}/posts-legacy?o={offset}");
         let resp = CLIENT.get(&api_url).send().await?;
         if !resp.status().is_success() {
@@ -49,7 +49,7 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
             break;
         }
         all_ids.extend(ids);
-        if total_count.map_or(false, |tc| all_ids.len() >= tc) {
+        if total_count.is_some_and(|tc| all_ids.len() >= tc) {
             break;
         }
         offset += PAGE_SIZE;
@@ -116,7 +116,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
 
     tasks.join_all().await;
 
-    PB.println(format!(
+    let _ = PB.println(format!(
         "获取详情完成，共 {} 个资源",
         attachments.lock().await.len()
     ));

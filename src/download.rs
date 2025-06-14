@@ -23,7 +23,7 @@ pub async fn download_attachments(
     );
     let username = Arc::new(
         url.path_segments()
-            .and_then(|segments| segments.last())
+            .and_then(|mut segments| segments.next_back())
             .ok_or_else(|| anyhow::anyhow!("无法获取用户名"))?
             .to_string(),
     );
@@ -58,7 +58,7 @@ pub async fn download_attachments(
             );
 
             let folder = format!("{}/{}", output, username);
-            fs::create_dir_all(&folder).await;
+            let _ = fs::create_dir_all(&folder).await;
             let path = format!("{}/{}", folder, att.name);
             let mut downloaded = 0u64;
             if Path::new(&path).exists() {
@@ -74,7 +74,7 @@ pub async fn download_attachments(
             }
             let resp = req.send().await.unwrap();
             if resp.status() == 416 {
-                PB.println(format!(
+                let _ = PB.println(format!(
                     "文件已下载完成: {} - {}",
                     resp.status(),
                     resp.url()
@@ -84,7 +84,7 @@ pub async fn download_attachments(
                 return;
             }
             if !(resp.status().is_success() || resp.status() == 206) {
-                PB.println(format!(
+                let _ = PB.println(format!(
                     "下载失败: {} - {}",
                     resp.status(),
                     resp.url()
@@ -97,7 +97,7 @@ pub async fn download_attachments(
                 resp.headers()
                     .get(header::CONTENT_RANGE)
                     .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.split('/').last())
+                    .and_then(|s| s.split('/').next_back())
                     .and_then(|n| n.parse().ok())
                     .unwrap_or(downloaded + resp.content_length().unwrap_or(0))
             } else {
@@ -106,7 +106,7 @@ pub async fn download_attachments(
 
             let mut file = OpenOptions::new()
                 .write(true)
-                .create(true)
+                .create(true).truncate(true)
                 .open(&path)
                 .await.unwrap();
             let mut pos = downloaded;

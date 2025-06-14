@@ -19,7 +19,7 @@ static CLIENT: LazyLock<Client> = LazyLock::new(|| {
         .build()
         .expect("Failed to create HTTP client")
 });
-static PB: LazyLock<MultiProgress> = LazyLock::new(|| MultiProgress::new());
+static PB: LazyLock<MultiProgress> = LazyLock::new(MultiProgress::new);
 static SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(2)));
 
 #[derive(Parser)]
