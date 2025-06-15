@@ -16,15 +16,18 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
 
     let domain = url
         .host_str()
-        .ok_or_else(|| anyhow::anyhow!("无效的 URL: {}", url))?;
+        .ok_or_else(|| anyhow::anyhow!("Invalid URL:{}", url))?;
     let parts = url.path_segments().unwrap().collect::<Vec<_>>().join("/");
 
     loop {
-        let _ = PB.println(format!("正在获取第 {} 页数据...", offset / PAGE_SIZE + 1));
+        let _ = PB.println(format!(
+            "Fetching data for page {}...",
+            offset / PAGE_SIZE + 1
+        ));
         let api_url = format!("https://{domain}/api/v1/{parts}/posts-legacy?o={offset}");
-        let resp = CLIENT.get(&api_url).send().await?;
+        let resp = CLIENT.get().unwrap().get(&api_url).send().await?;
         if !resp.status().is_success() {
-            anyhow::bail!("无法访问 {}", api_url);
+            anyhow::bail!("Unable to access {}", api_url);
         }
         let data = resp.json::<serde_json::Value>().await?;
         if total_count.is_none() {
@@ -68,7 +71,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
     let url = reqwest::Url::parse(url)?;
     let domain = Arc::new(
         url.host_str()
-            .ok_or_else(|| anyhow::anyhow!("无效的 URL: {}", url))?
+            .ok_or_else(|| anyhow::anyhow!("Invalid URL:{}", url))?
             .to_owned(),
     );
     let parts = Arc::new(url.path_segments().unwrap().collect::<Vec<_>>().join("/"));
@@ -77,7 +80,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
     let mut tasks = JoinSet::new();
 
     let pb = Arc::new(PB.add(ProgressBar::new(ids.len() as u64)));
-    pb.set_message("正在获取详情...");
+    pb.set_message("Fetching details...");
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_style(
         style::ProgressStyle::with_template(
@@ -96,7 +99,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
             let _permit = sem.acquire().await;
             let mut attachments = attachments.lock().await;
             let url = format!("https://{domain}/api/v1/{parts}/post/{id}");
-            let resp = CLIENT.get(&url).send().await;
+            let resp = CLIENT.get().unwrap().get(&url).send().await;
             match resp {
                 Ok(resp) if resp.status().is_success() => {
                     let json: serde_json::Value = resp.json().await.unwrap_or_default();
@@ -107,7 +110,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
                     }
                 }
                 _ => {
-                    let _ = PB.println(format!("获取详情失败 {}", id));
+                    let _ = PB.println(format!("Failed to retrieve details {}", id));
                 }
             }
             pb.inc(1);
@@ -117,7 +120,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
     tasks.join_all().await;
 
     let _ = PB.println(format!(
-        "获取详情完成，共 {} 个资源",
+        "Finished retrieving details, total {} resources",
         attachments.lock().await.len()
     ));
 

@@ -53,7 +53,7 @@ pub async fn download_attachments(
             if Path::new(&path).exists() {
                 downloaded = fs::metadata(&path).await.unwrap().len();
             }
-            let mut req = CLIENT.get(format!(
+            let mut req = CLIENT.get().unwrap().get(format!(
                 "{}/data{}",
                 att.server.as_ref().unwrap_or(&format!(
                     "https://{}",

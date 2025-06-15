@@ -7,30 +7,33 @@ mod parse;
 use clap::Parser;
 use indicatif::MultiProgress;
 use reqwest::Client;
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 use tokio::sync::Semaphore;
 
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
-static CLIENT: LazyLock<Client> = LazyLock::new(|| {
-    Client::builder()
-        .user_agent(USER_AGENT)
-        .proxy(reqwest::Proxy::all("socks5://192.168.2.1:7890").expect("Failed to create proxy"))
-        .build()
-        .expect("Failed to create HTTP client")
-});
+static CLIENT: OnceLock<Client> = OnceLock::new();
 static PB: LazyLock<MultiProgress> = LazyLock::new(MultiProgress::new);
 static SEM: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(5)));
 
 #[derive(Parser)]
-#[command(author, version, about = "下载 Kemono / Coomer 的视频并保存到文件夹")]
+#[command(
+    author,
+    version,
+    about = "Download videos from Kemono / Coomer and save to a folder"
+)]
 struct Args {
     /// Kemono / Coomer Artist 的 URL
     url: String,
-    /// 保存下载视频的文件夹
+
+    /// Folder to save downloaded videos
     #[arg(short, long, default_value = "./download")]
     output: String,
+
+    /// Proxy URL (optional)
+    /// Example: socks5://192.168.2.1:7890
+    proxy: Option<String>,
 }
 
 #[tokio::main]
@@ -38,16 +41,34 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     if !(args.url.contains("kemono") || args.url.contains("coomer")) {
-        anyhow::bail!("URL 必须是 Kemono 或 Coomer 的 Artist 页面。");
+        anyhow::bail!("URL must be a Kemono or Coomer artist page.");
     }
 
-    // 获取所有未下载的资源 ID
+    let client = if let Some(proxy) = args.proxy {
+        Client::builder()
+            .user_agent(USER_AGENT)
+            .proxy(reqwest::Proxy::all(proxy).expect("Failed to create proxy"))
+            .build()
+            .expect("Failed to create HTTP client")
+    } else {
+        Client::builder()
+            .user_agent(USER_AGENT)
+            .build()
+            .expect("Failed to create HTTP client")
+    };
+
+    // Initialize the global HTTP client
+    CLIENT
+        .set(client)
+        .expect("Failed to set global HTTP client");
+
+    // Get all un-downloaded resource IDs
     let all_ids = parse_artist_url(&args.url).await?;
 
-    // 获取资源详情
+    // Get resource details
     let atts = get_details(&args.url, all_ids).await?;
 
-    // 开始下载
+    // Start downloading
     download_attachments(&args.url, &args.output, atts).await?;
 
     Ok(())
