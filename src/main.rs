@@ -33,6 +33,7 @@ struct Args {
 
     /// Proxy URL (optional)
     /// Example: socks5://192.168.2.1:7890
+    #[arg(short, long)]
     proxy: Option<String>,
 }
 
