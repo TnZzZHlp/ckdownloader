@@ -62,7 +62,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.ref }}
+                  ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
 
             - name: Install Rust Toolchain Components
               uses: dtolnay/rust-toolchain@stable
@@ -79,7 +79,7 @@ jobs:
               if: ${{ contains(matrix.target, 'windows') }}
               with:
                   draft: false
-                  tag_name: ${{ github.ref_name }}
+                  tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
                   files: |
                       target/${{ matrix.target }}/release/ckdownloader.exe
               env:
@@ -90,7 +90,7 @@ jobs:
               if: ${{ !contains(matrix.target, 'windows') }}
               with:
                   draft: false
-                  tag_name: ${{ github.ref_name }}
+                  tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
                   files: |
                       target/${{ matrix.target }}/release/ckdownloader
               env:
