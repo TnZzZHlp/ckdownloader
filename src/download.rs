@@ -56,7 +56,7 @@ pub async fn download_attachments(
     Ok(())
 }
 
-#[retry(stop=attempts(2))]
+#[retry(stop=attempts(3))]
 async fn download(
     att: Attachment,
     output: &str,
