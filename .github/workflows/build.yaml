@@ -17,7 +17,6 @@ jobs:
                 include:
                     - target: x86_64-pc-windows-msvc
                       os: windows-latest
-                      archive: zip
                     # - target: i686-pc-windows-gnu  # error: linker `i686-w64-mingw32-gcc` not found
                     #   os: windows-latest
                     #   archive: zip
@@ -37,7 +36,6 @@ jobs:
                     #   archive: tar.gz tar.xz tar.zst
                     - target: x86_64-unknown-linux-gnu
                       os: ubuntu-latest
-                      archive: tar.gz tar.xz tar.zst
                 #   - target: arm-unknown-linux-musleabi
                 #     os: ubuntu-latest
                 #     archive: tar.gz tar.xz tar.zst
@@ -55,8 +53,6 @@ jobs:
                 #   archive: tar.gz tar.xz tar.zst
 
         runs-on: ${{matrix.os}}
-        env:
-            DIST_DIR: ckdownloader-${{ matrix.target }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -73,52 +69,24 @@ jobs:
               run: |
                   cargo build --release --target ${{ matrix.target }}
 
-            - name: Prepare package
-              run: |
-                  mkdir $DIST_DIR
-                  cp LICENSE $DIST_DIR
-                  cp example.config.json $DIST_DIR
-                  echo "Version: ${{ github.ref_name }}" > $DIST_DIR/version
-                  echo "Build date: $(date)" >> $DIST_DIR/version
-                  echo "Commit: $(git rev-parse HEAD)" >> $DIST_DIR/version
-              shell: bash
-
-            - name: Publish archive
-              if: ${{ !contains(matrix.target, 'windows') }}
-              env:
-                  ARCHIVE_FILE: ckdownloader-${{ matrix.target }}-${{ github.ref_name }}.tar.gz
-              run: |
-                  cp target/${{ matrix.target }}/release/ckdownloader $DIST_DIR/ckdownloader
-                  tar -zcvf $ARCHIVE_FILE $DIST_DIR
-                  shasum -a256 $ARCHIVE_FILE > $ARCHIVE_FILE-sha256sum.txt
-                  echo "archive_file=$ARCHIVE_FILE" >> $GITHUB_ENV
-
-            - name: Publish zip archive windows
+            - name: Publish release Windows
+              uses: softprops/action-gh-release@v2
               if: ${{ contains(matrix.target, 'windows') }}
-              env:
-                  ARCHIVE_FILE: ckdownloader-${{ matrix.target }}-${{ github.ref_name }}.zip
-              run: |
-                  cp target/${{ matrix.target }}/release/ckdownloader.exe $DIST_DIR/ckdownloader.exe
-                  7z a -tzip $ARCHIVE_FILE $DIST_DIR
-                  echo ${{ hashFiles(env.ARCHIVE_FILE) }} > $ARCHIVE_FILE-sha256sum.txt
-                  echo "archive_file=$ARCHIVE_FILE" >> $GITHUB_ENV
-              shell: bash
-
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ckdownloader-${{ matrix.target }}-${{ github.ref_name }}
-                  retention-days: 30
-                  path: ${{ env.archive_file }}
-
-            - name: Publish release
-              uses: softprops/action-gh-release@v2.0.6
-              if: ${{ startsWith(github.ref_name, 'v') }}
               with:
                   draft: false
                   tag_name: ${{ github.ref_name }}
                   files: |
-                      ${{ env.archive_file }}
-                      ${{ env.archive_file }}-sha256sum.txt
+                      target/${{ matrix.target }}/release/ckdownloader.exe
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Publish release
+              uses: softprops/action-gh-release@v2
+              if: ${{ !contains(matrix.target, 'windows') }}
+              with:
+                  draft: false
+                  tag_name: ${{ github.ref_name }}
+                  files: |
+                      target/${{ matrix.target }}/release/ckdownloader
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
