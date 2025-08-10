@@ -40,6 +40,8 @@ ckdownloader <ARTIST_URL> [OPTIONS]
 
 - `-o, --output <OUTPUT>`: Folder to save downloaded attachments (default: `./download`).
 - `-p, --proxy <PROXY>`: Proxy URL (e.g., `socks5://127.0.0.1:1080`).
+- `-r, --retries <RETRIES>`: Number of retries for failed downloads (default: 3).
+- `-c, --concurrency <CONCURRENCY>`: Number of concurrent downloads (default: 5).
 
 ## Examples
 
