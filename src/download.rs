@@ -4,7 +4,7 @@ use reqwest::header;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::{self, OpenOptions};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::JoinSet;
 
 use crate::parse::Attachment;
@@ -122,9 +122,15 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
             .open("./error.txt")
             .await
             .unwrap();
-        let _ = file
-            .write_all(format!("{} - {}\n", url, resp.status()).as_bytes())
-            .await;
+
+        let mut contents = String::new();
+        let _ = file.read_to_string(&mut contents).await;
+        if contents.contains(&url) {
+            let _ = file
+                .write_all(format!("{} - {}\n", url, resp.status()).as_bytes())
+                .await;
+        }
+
         return;
     }
 
