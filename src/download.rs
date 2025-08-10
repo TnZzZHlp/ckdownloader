@@ -1,7 +1,6 @@
 use futures_util::StreamExt;
 use indicatif::ProgressStyle;
 use reqwest::header;
-use retrying::retry;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::{self, OpenOptions};

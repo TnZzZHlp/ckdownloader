@@ -30,11 +30,10 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
             anyhow::bail!("Unable to access {}", api_url);
         }
         let data = resp.json::<serde_json::Value>().await?;
-        if total_count.is_none() {
-            if let Some(props) = data.get("props") {
-                total_count =
-                    Some(props.get("count").and_then(|v| v.as_u64()).unwrap_or(0) as usize);
-            }
+        if total_count.is_none()
+            && let Some(props) = data.get("props")
+        {
+            total_count = Some(props.get("count").and_then(|v| v.as_u64()).unwrap_or(0) as usize);
         }
         let ids: Vec<_> = data
             .get("results")

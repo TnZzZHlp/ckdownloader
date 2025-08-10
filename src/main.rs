@@ -6,8 +6,7 @@ mod download;
 mod parse;
 use clap::Parser;
 use indicatif::MultiProgress;
-use reqwest::{Client, retry::Builder};
-use reqwest::{StatusCode, retry};
+use reqwest::Client;
 use std::sync::{Arc, LazyLock, OnceLock};
 use tokio::sync::Semaphore;
 
@@ -17,7 +16,6 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
 static CLIENT: OnceLock<Client> = OnceLock::new();
 static PB: LazyLock<MultiProgress> = LazyLock::new(MultiProgress::new);
 static SEM: OnceLock<Arc<Semaphore>> = OnceLock::new();
-static RETRIES: OnceLock<u32> = OnceLock::new();
 
 #[derive(Parser)]
 #[command(
@@ -61,8 +59,9 @@ async fn main() -> anyhow::Result<()> {
     SEM.set(Arc::new(Semaphore::new(args.concurrent as usize)))
         .expect("Failed to set global semaphore");
 
-    let retry_strategy =
-        reqwest::retry::for_host(String::from("coomer.cr")).classify_fn(|req_rep| {
+    let retry_strategy = reqwest::retry::for_host(String::from("coomer.cr"))
+        .max_retries_per_request(args.retries)
+        .classify_fn(|req_rep| {
             if let Some(status) = req_rep.status() {
                 if status.is_success() {
                     req_rep.success()
