@@ -55,12 +55,7 @@ pub async fn download_attachments(
     Ok(())
 }
 
-async fn download(
-    att: Attachment,
-    output: &str,
-    username: &str,
-    domain: &str,
-) -> Result<(), anyhow::Error> {
+async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
     let _permit = SEM.get().unwrap().acquire().await;
 
     let folder = format!("{}/{}", output, username);
@@ -70,13 +65,14 @@ async fn download(
     if Path::new(&path).exists() {
         downloaded = fs::metadata(&path).await.unwrap().len();
     }
-    let mut req = CLIENT.get().unwrap().get(format!(
+    let url = format!(
         "{}/data{}",
         att.server
             .as_ref()
             .unwrap_or(&format!("https://{}", domain)),
         att.path
-    ));
+    );
+    let mut req = CLIENT.get().unwrap().get(&url);
     if downloaded > 0 {
         req = req.header(header::RANGE, format!("bytes={}-", downloaded));
     }
@@ -84,8 +80,8 @@ async fn download(
     let resp = match req.send().await {
         Ok(resp) => resp,
         Err(err) => {
-            let _ = PB.println(format!("Download failed: {} - {}", att.name, err));
-            return Err(anyhow::anyhow!("Download failed: {} - {}", att.name, err));
+            let _ = PB.println(format!("Download failed: {} - {}", url, err));
+            return;
         }
     };
 
@@ -109,7 +105,7 @@ async fn download(
             resp.url()
         ));
         pb.finish_and_clear();
-        return Ok(());
+        return;
     }
     if !(resp.status().is_success() || resp.status() == 206) {
         let _ = PB.println(format!(
@@ -118,11 +114,7 @@ async fn download(
             resp.url()
         ));
         pb.finish_and_clear();
-        return Err(anyhow::anyhow!(
-            "Download failed: {} - {}",
-            resp.status(),
-            resp.url()
-        ));
+        return;
     }
     if resp.status() == 206 {
         resp.headers()
@@ -154,8 +146,8 @@ async fn download(
                 pb.set_position(pos);
             }
             Err(err) => {
-                let _ = PB.println(format!("Download failed: {} - {}", att.name, err));
-                return Err(anyhow::anyhow!("Download failed: {} - {}", att.name, err));
+                let _ = PB.println(format!("Download failed: {} - {}", url, err));
+                return;
             }
         }
     }
@@ -163,6 +155,4 @@ async fn download(
     file.flush().await.unwrap();
 
     pb.finish_and_clear();
-
-    Ok(())
 }
