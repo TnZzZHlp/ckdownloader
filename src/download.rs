@@ -16,16 +16,16 @@ pub async fn download_attachments(
     attachments: Vec<Attachment>,
 ) -> anyhow::Result<()> {
     let url = reqwest::Url::parse(url)
-        .map_err(|e| anyhow::anyhow!("无效的 URL: {}，错误: {}", url, e))?;
+        .map_err(|e| anyhow::anyhow!("Invalid URL: {}, Error: {}", url, e))?;
     let domain = Arc::new(
         url.host_str()
-            .ok_or_else(|| anyhow::anyhow!("无法解析域名: {}", url))?
+            .ok_or_else(|| anyhow::anyhow!("Unable to resolve domain name: {}", url))?
             .to_string(),
     );
     let username = Arc::new(
         url.path_segments()
             .and_then(|mut segments| segments.next_back())
-            .ok_or_else(|| anyhow::anyhow!("无法获取用户名"))?
+            .ok_or_else(|| anyhow::anyhow!("Unable to retrieve username"))?
             .to_string(),
     );
 
@@ -56,14 +56,13 @@ pub async fn download_attachments(
     Ok(())
 }
 
-#[retry(stop=attempts(3))]
 async fn download(
     att: Attachment,
     output: &str,
     username: &str,
     domain: &str,
 ) -> Result<(), anyhow::Error> {
-    let _permit = SEM.acquire().await;
+    let _permit = SEM.get().unwrap().acquire().await;
 
     let folder = format!("{}/{}", output, username);
     let _ = fs::create_dir_all(&folder).await;
@@ -94,7 +93,7 @@ async fn download(
     let pb = PB.add(indicatif::ProgressBar::new(
         downloaded + resp.content_length().unwrap_or(0),
     ));
-    pb.set_message(format!("正在下载: {}", att.name));
+    pb.set_message(format!("Downloading: {}", att.name));
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb.set_style(
                 ProgressStyle::with_template(
@@ -106,7 +105,7 @@ async fn download(
 
     if resp.status() == 416 {
         let _ = PB.println(format!(
-            "文件已下载完成: {} - {}",
+            "File download completed.: {} - {}",
             resp.status(),
             resp.url()
         ));

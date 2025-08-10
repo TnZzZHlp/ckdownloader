@@ -96,7 +96,7 @@ pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Atta
         let pb = Arc::clone(&pb);
         let sem = crate::SEM.clone();
         tasks.spawn(async move {
-            let _permit = sem.acquire().await;
+            let _permit = sem.get().unwrap().acquire().await;
             let mut attachments = attachments.lock().await;
             let url = format!("https://{domain}/api/v1/{parts}/post/{id}");
             let resp = CLIENT.get().unwrap().get(&url).send().await;
