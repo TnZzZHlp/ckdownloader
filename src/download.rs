@@ -115,6 +115,16 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
             resp.url()
         ));
         pb.finish_and_clear();
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("./error.txt")
+            .await
+            .unwrap();
+        let _ = file
+            .write_all(format!("{} - {}\n", url, resp.status()).as_bytes())
+            .await;
         return;
     }
 
