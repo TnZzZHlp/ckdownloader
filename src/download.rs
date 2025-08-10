@@ -107,7 +107,8 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
         pb.finish_and_clear();
         return;
     }
-    if !(resp.status().is_success() || resp.status() == 206) {
+
+    if !(resp.status().is_success()) {
         let _ = PB.println(format!(
             "Download failed: {} - {}",
             resp.status(),
@@ -116,6 +117,7 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
         pb.finish_and_clear();
         return;
     }
+
     if resp.status() == 206 {
         resp.headers()
             .get(header::CONTENT_RANGE)
