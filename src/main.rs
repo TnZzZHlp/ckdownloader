@@ -1,4 +1,4 @@
-use crate::{download::download_attachments, parse::parse_artist_url};
+use crate::{download::download_files, parse::parse_artist_url};
 mod download;
 mod parse;
 use clap::Parser;
@@ -39,8 +39,8 @@ struct Args {
     retries: u32,
 
     /// Number of concurrent downloads
-    /// Default is 5 concurrent downloads
-    #[arg(short, long, default_value = "5")]
+    /// Default is 3 concurrent downloads
+    #[arg(short, long, default_value = "3")]
     concurrent: u32,
 }
 
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     let files = parse_artist_url(&args.url).await?;
 
     // Start downloading
-    download_attachments(&args.url, &args.output, files).await?;
+    download_files(&args.url, &args.output, files).await?;
 
     Ok(())
 }

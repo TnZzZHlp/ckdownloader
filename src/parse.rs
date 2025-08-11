@@ -6,6 +6,7 @@ const PAGE_SIZE: usize = 50;
 
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct File {
+    pub post_id: Option<String>,
     pub name: String,
     pub server: Option<String>,
     pub path: String,
@@ -44,15 +45,25 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<File>> {
             let results: Vec<Value> = serde_json::from_value(results.clone())?;
             results.iter().for_each(|result| {
                 if let Some(file) = result.get("file")
-                    && let Ok(file) = serde_json::from_value::<File>(file.clone())
+                    && let Ok(mut file) = serde_json::from_value::<File>(file.clone())
                 {
+                    file.post_id = result
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
                     all_files.push(file);
                 }
 
                 if let Some(thumb) = result.get("attachments")
                     && let Ok(files) = serde_json::from_value::<Vec<File>>(thumb.clone())
                 {
-                    all_files.extend(files);
+                    files.into_iter().for_each(|mut file| {
+                        file.post_id = result
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        all_files.push(file);
+                    });
                 }
             });
         }

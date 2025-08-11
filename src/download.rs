@@ -9,11 +9,7 @@ use tokio::task::JoinSet;
 
 use crate::parse::File;
 use crate::{CLIENT, PB, SEM};
-pub async fn download_attachments(
-    url: &str,
-    output: &str,
-    attachments: Vec<File>,
-) -> anyhow::Result<()> {
+pub async fn download_files(url: &str, output: &str, files: Vec<File>) -> anyhow::Result<()> {
     let url = reqwest::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("Invalid URL: {}, Error: {}", url, e))?;
     let domain = Arc::new(
@@ -28,7 +24,7 @@ pub async fn download_attachments(
             .to_string(),
     );
 
-    let video_pbar = Arc::new(PB.add(indicatif::ProgressBar::new(attachments.len() as u64)));
+    let video_pbar = Arc::new(PB.add(indicatif::ProgressBar::new(files.len() as u64)));
     video_pbar.set_style(
         ProgressStyle::default_bar()
             .template("[{wide_bar:.green/white}] [{pos}/{len}]")
@@ -37,15 +33,15 @@ pub async fn download_attachments(
     );
 
     let mut tasks = JoinSet::new();
-    for att in attachments {
+    for file in files {
         let video_pbar = Arc::clone(&video_pbar);
         let output = output.to_string();
         let username = Arc::clone(&username);
         let domain = Arc::clone(&domain);
 
         tasks.spawn(async move {
-            let att = att.clone();
-            let _ = download(att, &output, &username, &domain).await;
+            let file = file.clone();
+            let _ = download(file, &output, &username, &domain).await;
             video_pbar.inc(1);
         });
     }
@@ -60,7 +56,7 @@ async fn download(file: File, output: &str, username: &str, domain: &str) {
 
     let folder = format!("{}/{}", output, username);
     let _ = fs::create_dir_all(&folder).await;
-    let path = format!("{}/{}", folder, file.name);
+    let path = format!("{}/{}/{}", folder, file.post_id.unwrap(), file.name);
     let mut downloaded = 0u64;
     if Path::new(&path).exists() {
         downloaded = fs::metadata(&path).await.unwrap().len();
@@ -101,7 +97,7 @@ async fn download(file: File, output: &str, username: &str, domain: &str) {
             );
 
     if resp.status() == 416 {
-        let _ = PB.println(format!("File download completed.: {}", resp.url()));
+        let _ = PB.println(format!("File download completed: {}", resp.url()));
         pb.finish_and_clear();
         return;
     }
@@ -142,6 +138,10 @@ async fn download(file: File, output: &str, username: &str, domain: &str) {
     } else {
         resp.content_length().unwrap_or(0)
     };
+
+    if !Path::new(&path).parent().unwrap().exists() {
+        let _ = fs::create_dir_all(Path::new(&path).parent().unwrap()).await;
+    }
 
     let mut file = OpenOptions::new()
         .write(true)
