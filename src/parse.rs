@@ -1,14 +1,18 @@
-use std::{sync::Arc, time::Duration};
-
-use futures_util::lock::Mutex;
-use indicatif::{ProgressBar, style};
-use tokio::task::JoinSet;
+use serde_json::Value;
 
 use crate::{CLIENT, PB};
 
 const PAGE_SIZE: usize = 50;
-pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
-    let mut all_ids = Vec::new();
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct File {
+    pub name: String,
+    pub server: Option<String>,
+    pub path: String,
+}
+
+pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<File>> {
+    let mut all_files = Vec::new();
     let mut offset = 0;
     let mut total_count: Option<usize> = None;
 
@@ -35,97 +39,33 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<String>> {
         {
             total_count = Some(props.get("count").and_then(|v| v.as_u64()).unwrap_or(0) as usize);
         }
-        let ids: Vec<_> = data
-            .get("results")
-            .and_then(|v| v.as_array())
-            .unwrap_or(&Vec::new())
-            .iter()
-            .map(|x| {
-                x.get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("0")
-                    .to_string()
-            })
-            .collect();
-        if ids.is_empty() {
-            break;
+
+        if let Some(results) = data.get("results") {
+            let results: Vec<Value> = serde_json::from_value(results.clone())?;
+            results.iter().for_each(|result| {
+                if let Some(file) = result.get("file")
+                    && let Ok(file) = serde_json::from_value::<File>(file.clone())
+                {
+                    all_files.push(file);
+                }
+
+                if let Some(thumb) = result.get("attachments")
+                    && let Ok(files) = serde_json::from_value::<Vec<File>>(thumb.clone())
+                {
+                    all_files.extend(files);
+                }
+            });
         }
-        all_ids.extend(ids);
-        if total_count.is_some_and(|tc| all_ids.len() >= tc) {
-            break;
-        }
+
         offset += PAGE_SIZE;
-    }
-    Ok(all_ids)
-}
 
-#[derive(serde::Deserialize, Debug, Clone)]
-pub struct Attachment {
-    pub name: String,
-    pub server: Option<String>,
-    pub path: String,
-}
-
-pub async fn get_details(url: &str, ids: Vec<String>) -> anyhow::Result<Vec<Attachment>> {
-    let url = reqwest::Url::parse(url)?;
-    let domain = Arc::new(
-        url.host_str()
-            .ok_or_else(|| anyhow::anyhow!("Invalid URL:{}", url))?
-            .to_owned(),
-    );
-    let parts = Arc::new(url.path_segments().unwrap().collect::<Vec<_>>().join("/"));
-
-    let attachments = Arc::new(Mutex::new(Vec::new()));
-    let mut tasks = JoinSet::new();
-
-    let pb = Arc::new(PB.add(ProgressBar::new(ids.len() as u64)));
-    pb.set_message("Fetching details...");
-    pb.enable_steady_tick(Duration::from_millis(100));
-    pb.set_style(
-        style::ProgressStyle::with_template(
-            "[{elapsed_precise}] [{wide_bar:.cyan/blue}] [{pos}/{len}]",
-        )
-        .unwrap()
-        .progress_chars("=>-"),
-    );
-    for id in ids {
-        let attachments = Arc::clone(&attachments);
-        let domain = Arc::clone(&domain);
-        let parts = Arc::clone(&parts);
-        let pb = Arc::clone(&pb);
-        let sem = crate::SEM.clone();
-        tasks.spawn(async move {
-            let _permit = sem.get().unwrap().acquire().await;
-            let mut attachments = attachments.lock().await;
-            let url = format!("https://{domain}/api/v1/{parts}/post/{id}");
-            let resp = CLIENT.get().unwrap().get(&url).send().await;
-            match resp {
-                Ok(resp) if resp.status().is_success() => {
-                    let json: serde_json::Value = resp.json().await.unwrap_or_default();
-                    if let Some(atts) = json.get("attachments") {
-                        let list: Vec<Attachment> =
-                            serde_json::from_value(atts.clone()).unwrap_or_default();
-                        attachments.extend(list);
-                    }
-                }
-                _ => {
-                    let _ = PB.println(format!("Failed to retrieve details {}", id));
-                }
-            }
-            pb.inc(1);
-        });
+        // Judge if we have fetched all pages
+        if let Some(count) = total_count
+            && offset >= count
+        {
+            break;
+        }
     }
 
-    tasks.join_all().await;
-
-    let _ = PB.println(format!(
-        "Finished retrieving details, total {} resources",
-        attachments.lock().await.len()
-    ));
-
-    pb.finish_and_clear();
-
-    Ok(Arc::try_unwrap(attachments)
-        .unwrap_or_default()
-        .into_inner())
+    Ok(all_files)
 }

@@ -1,7 +1,4 @@
-use crate::{
-    download::download_attachments,
-    parse::{get_details, parse_artist_url},
-};
+use crate::{download::download_attachments, parse::parse_artist_url};
 mod download;
 mod parse;
 use clap::Parser;
@@ -94,13 +91,10 @@ async fn main() -> anyhow::Result<()> {
         .expect("Failed to set global HTTP client");
 
     // Get all un-downloaded resource IDs
-    let all_ids = parse_artist_url(&args.url).await?;
-
-    // Get resource details
-    let atts = get_details(&args.url, all_ids).await?;
+    let files = parse_artist_url(&args.url).await?;
 
     // Start downloading
-    download_attachments(&args.url, &args.output, atts).await?;
+    download_attachments(&args.url, &args.output, files).await?;
 
     Ok(())
 }

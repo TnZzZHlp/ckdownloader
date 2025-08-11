@@ -7,12 +7,12 @@ use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::JoinSet;
 
-use crate::parse::Attachment;
+use crate::parse::File;
 use crate::{CLIENT, PB, SEM};
 pub async fn download_attachments(
     url: &str,
     output: &str,
-    attachments: Vec<Attachment>,
+    attachments: Vec<File>,
 ) -> anyhow::Result<()> {
     let url = reqwest::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("Invalid URL: {}, Error: {}", url, e))?;
@@ -55,23 +55,25 @@ pub async fn download_attachments(
     Ok(())
 }
 
-async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
+async fn download(file: File, output: &str, username: &str, domain: &str) {
     let _permit = SEM.get().unwrap().acquire().await;
 
     let folder = format!("{}/{}", output, username);
     let _ = fs::create_dir_all(&folder).await;
-    let path = format!("{}/{}", folder, att.name);
+    let path = format!("{}/{}", folder, file.name);
     let mut downloaded = 0u64;
     if Path::new(&path).exists() {
         downloaded = fs::metadata(&path).await.unwrap().len();
     }
+
     let url = format!(
         "{}/data{}",
-        att.server
+        file.server
             .as_ref()
             .unwrap_or(&format!("https://{}", domain)),
-        att.path
+        file.path
     );
+
     let mut req = CLIENT.get().unwrap().get(&url);
     if downloaded > 0 {
         req = req.header(header::RANGE, format!("bytes={}-", downloaded));
@@ -88,7 +90,7 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
     let pb = PB.add(indicatif::ProgressBar::new(
         downloaded + resp.content_length().unwrap_or(0),
     ));
-    pb.set_message(format!("Downloading: {}", att.name));
+    pb.set_message(format!("Downloading: {}", file.name));
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb.set_style(
                 ProgressStyle::with_template(
@@ -99,16 +101,12 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
             );
 
     if resp.status() == 416 {
-        let _ = PB.println(format!(
-            "File download completed.: {} - {}",
-            resp.status(),
-            resp.url()
-        ));
+        let _ = PB.println(format!("File download completed.: {}", resp.url()));
         pb.finish_and_clear();
         return;
     }
 
-    if !(resp.status().is_success()) {
+    if !resp.status().is_success() {
         let _ = PB.println(format!(
             "Download failed: {} - {}",
             resp.status(),
@@ -125,7 +123,7 @@ async fn download(att: Attachment, output: &str, username: &str, domain: &str) {
 
         let mut contents = String::new();
         let _ = file.read_to_string(&mut contents).await;
-        if contents.contains(&url) {
+        if !contents.contains(&url) {
             let _ = file
                 .write_all(format!("{} - {}\n", url, resp.status()).as_bytes())
                 .await;
