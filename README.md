@@ -2,6 +2,10 @@
 
 A command-line tool written in Rust to download attachments (videos, images, etc.) from Kemono and Coomer artist pages and save them to a local folder.
 
+## Note that
+
+Please do not abuse this tool to download large amounts of content. Always adhere to the terms and conditions of the relevant websites.
+
 ## Features
 
 - Parse Kemono/Coomer artist pages
@@ -72,7 +76,3 @@ This project makes use of:
 - [tokio](https://crates.io/crates/tokio) for asynchronous runtime
 - [indicatif](https://crates.io/crates/indicatif) for progress bars
 - [anyhow](https://crates.io/crates/anyhow) for error handling
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
