@@ -2,9 +2,8 @@
 
 A command-line tool written in Rust to download attachments (videos, images, etc.) from Kemono and Coomer artist pages and save them to a local folder.
 
-## Note that
-
-Please do not abuse this tool to download large amounts of content. Always adhere to the terms and conditions of the relevant websites.
+> [!IMPORTANT]
+> Please do not abuse this tool to download large amounts of content. Always adhere to the terms and conditions of the relevant websites.
 
 ## Features
 
