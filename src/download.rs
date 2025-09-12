@@ -56,7 +56,12 @@ async fn download(file: File, output: &str, username: &str, domain: &str) {
 
     let folder = format!("{}/{}", output, username);
     let _ = fs::create_dir_all(&folder).await;
-    let path = format!("{}/{}/{}", folder, file.post_id.unwrap(), file.name);
+    let path = format!(
+        "{}/{}/{}",
+        folder,
+        file.post_id.unwrap(),
+        sanitize_filename::sanitize(&file.name)
+    );
     let mut downloaded = 0u64;
     if Path::new(&path).exists() {
         downloaded = fs::metadata(&path).await.unwrap().len();
