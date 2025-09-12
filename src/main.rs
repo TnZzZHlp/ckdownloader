@@ -81,6 +81,11 @@ async fn main() -> anyhow::Result<()> {
         Client::builder()
             .user_agent(USER_AGENT)
             .retry(retry_strategy)
+            .default_headers({
+                let mut headers = reqwest::header::HeaderMap::new();
+                headers.insert(reqwest::header::ACCEPT, "text/css".parse().unwrap());
+                headers
+            })
             .build()
             .expect("Failed to create HTTP client")
     };

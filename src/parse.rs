@@ -29,44 +29,50 @@ pub async fn parse_artist_url(url: &str) -> anyhow::Result<Vec<File>> {
             "Fetching data for page {}...",
             offset / PAGE_SIZE + 1
         ));
-        let api_url = format!("https://{domain}/api/v1/{parts}/posts-legacy?o={offset}");
+        let api_url = format!("https://{domain}/api/v1/{parts}/posts?o={offset}");
         let resp = CLIENT.get().unwrap().get(&api_url).send().await?;
+
+        if resp.status() == 400 {
+            break;
+        }
+
         if !resp.status().is_success() {
             anyhow::bail!("Unable to access {}", api_url);
         }
-        let data = resp.json::<serde_json::Value>().await?;
+
+        let data = resp.text().await?;
+
+        let data: Value = serde_json::from_str(&data)?;
+
         if total_count.is_none()
             && let Some(props) = data.get("props")
         {
             total_count = Some(props.get("count").and_then(|v| v.as_u64()).unwrap_or(0) as usize);
         }
 
-        if let Some(results) = data.get("results") {
-            let results: Vec<Value> = serde_json::from_value(results.clone())?;
-            results.iter().for_each(|result| {
-                if let Some(file) = result.get("file")
-                    && let Ok(mut file) = serde_json::from_value::<File>(file.clone())
-                {
+        data.as_array().unwrap().iter().for_each(|result| {
+            if let Some(file) = result.get("file")
+                && let Ok(mut file) = serde_json::from_value::<File>(file.clone())
+            {
+                file.post_id = result
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                all_files.push(file);
+            }
+
+            if let Some(thumb) = result.get("attachments")
+                && let Ok(files) = serde_json::from_value::<Vec<File>>(thumb.clone())
+            {
+                files.into_iter().for_each(|mut file| {
                     file.post_id = result
                         .get("id")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
                     all_files.push(file);
-                }
-
-                if let Some(thumb) = result.get("attachments")
-                    && let Ok(files) = serde_json::from_value::<Vec<File>>(thumb.clone())
-                {
-                    files.into_iter().for_each(|mut file| {
-                        file.post_id = result
-                            .get("id")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        all_files.push(file);
-                    });
-                }
-            });
-        }
+                });
+            }
+        });
 
         offset += PAGE_SIZE;
 
